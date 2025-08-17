@@ -1,64 +1,45 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchUsers, type User, SLOTS } from "../api/users";
+import { fetchUsers, type User } from "../api/users";
+import { getRandomNumber, pushaffle } from "../helpers/helpers";
 
 export function useUsersSlots() {
-  const [slots, setSlots] = useState<Array<User | null>>(Array(SLOTS).fill(null));
-  const [updatedIndices, setUpdatedIndices] = useState<number[]>([]);
-  const countRef = useRef(SLOTS);
-  const [count, setCount] = useState(SLOTS);
-  const [trigger, setTrigger] = useState(0);
+  const [updatedIndices] = useState<number[]>([]);
+  const [count, setCount] = useState(10);
+  const [users, setUsers] = useState<User[]>([]);
 
   const { data, isFetching, error } = useQuery({
-    queryKey: ["users", count, trigger],
-    queryFn: () => fetchUsers(count),
+    queryKey: ["users"],
+    queryFn: () => fetchUsers({ count }),
     refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData, 
+    placeholderData: keepPreviousData,
+    refetchInterval: 3000,
   });
 
   useEffect(() => {
-    if (!data) return;
-    if (trigger === 0) {
-      const newSlots = Array(SLOTS).fill(null);
-      data.slice(0, SLOTS).forEach((user, i) => (newSlots[i] = user));
-      setSlots(newSlots);
-      setUpdatedIndices(data.slice(0, SLOTS).map((_, i) => i));
-      setTimeout(() => setUpdatedIndices([]), 700);
+    if (!users.length && data?.length) {
+      setUsers(data);
     }
-  }, [data, trigger]);
 
-  useEffect(() => {
-    if (!data || trigger === 0) return;
+    if (users.length && data?.length) {
+      const indexesForReplacing = pushaffle(count);
 
-    const k = Math.min(data.length, SLOTS);
-    const positions = new Set<number>();
-    while (positions.size < k) positions.add(Math.floor(Math.random() * SLOTS));
-    const posArray = Array.from(positions);
+      const updatedUsers = users.map((user, index, array) => {
+        if (indexesForReplacing.includes(index) && index < array.length) {
+          return data[indexesForReplacing.indexOf(index)];
+        }
 
-    setSlots(prev => {
-      const newSlots = [...prev];
-      for (let i = 0; i < k; i++) newSlots[posArray[i]] = data[i];
-      return newSlots;
-    });
+        return user;
+      });
 
-    setUpdatedIndices(posArray);
-    const timer = setTimeout(() => setUpdatedIndices([]), 700);
-    return () => clearTimeout(timer);
-  }, [data, trigger]);
+      setUsers(updatedUsers);
+    }
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      let nextCount = Math.floor(Math.random() * SLOTS) + 1;
-      if (nextCount === countRef.current) nextCount = (nextCount % SLOTS) + 1;
-      countRef.current = nextCount;
-      setCount(nextCount);
-      setTrigger(t => t + 1);
-    }, 3000);
-    return () => clearInterval(intervalId);
-  }, []);
+    setCount(getRandomNumber(10));
+  }, [data]);
 
   return {
-    slots,
+    slots: users,
     updatedIndices,
     isFetching,
     error: error instanceof Error ? error.message : null,
