@@ -8,9 +8,15 @@ export type User = {
 
 const SLOTS = 10;
 
-export async function fetchUsers(count: number): Promise<User[]> {
-  const safeCount = Math.max(1, Math.min(SLOTS, Math.floor(count)));
-  const res = await axios.get(`https://randomuser.me/api/?results=${safeCount}&nat=us`);
+export async function fetchUsers({
+  count,
+}: {
+  count: number;
+}): Promise<User[]> {
+  const res = await axios.get(
+    `https://randomuser.me/api/?results=${count}&nat=us`
+  );
+
   return res.data.results as User[];
 }
 
